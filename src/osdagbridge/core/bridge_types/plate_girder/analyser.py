@@ -2614,6 +2614,23 @@ if __name__ == "__main__":
         edge_dist=bridge.edge_dist
     )
 
-    # result_handler.run_interactive_viewer()
-    # result_handler.print_moving_load_trace()
 
+# Calls extract_load_case_extremes and prints max BM and max SF for every load case with location and girder
+    from osdagbridge.core.bridge_types.plate_girder.plot_generator import (
+        extract_load_case_extremes,
+        build_nodes_members,
+    )
+    nodes, members = build_nodes_members()
+    extremes = extract_load_case_extremes(
+        results, nodes, members, edge_dist=bridge.edge_dist
+    )
+    print("\n" + "=" * 65)
+    print("  extract_load_case_extremes() OUTPUT")
+    print("=" * 65)
+
+    for row in extremes:
+        print(
+            f"  {row['load_case']:<35}"
+            f"  MaxBM={row['max_bm']} kN-m  location={row['bm_location']} m  girder={row['bm_girder']}"
+            f"  MaxSF={row['max_sf']} kN    location={row['sf_location']} m  girder={row['sf_girder']}"
+        )

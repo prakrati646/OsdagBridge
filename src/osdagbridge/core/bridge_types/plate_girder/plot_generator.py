@@ -1,6 +1,8 @@
 import io
 from collections import defaultdict
 
+
+
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -1486,3 +1488,160 @@ def figure_to_bytes(fig, fmt="png", dpi=150):
     buf.seek(0)
     plt.close(fig)
     return buf.read()
+
+
+# For every load case, finds max BM and max SF across all girders with their locations and girder names.
+def extract_load_case_extremes(
+    ds_all,
+    nodes: dict,
+    members: dict,
+    edge_dist: float = 0.0,
+    bm_force_key: str = "Mz",
+    sf_force_key: str = "Fy",
+) -> list[dict]:
+    """
+    For every load case in ds_all, find the absolute maximum BM and SF
+    across all structural girders and return a list of result dicts.
+
+    BM and SF are tracked independently so each can have a different girder.
+
+    Uses _find_girders and _build_polyline — the same helpers used by
+    build_figure_bmd and build_figure_sfd — so girder detection, element
+    ordering, force extraction, and edge-beam exclusion are all identical
+    to the existing plot logic.
+
+    Parameters
+    ----------
+    ds_all       : xarray.Dataset  full results (all load cases)
+    nodes        : dict  {node_tag: [x, y, z]}  from build_nodes_members()
+    members      : dict  {elem_tag: [n1, n2]}    from build_nodes_members()
+    edge_dist    : float  overhang distance in m; when > 0 the first and
+                          last girder lines are edge beams and are skipped,
+                          matching the behaviour of build_figure_bmd/sfd.
+    bm_force_key : str   key into FORCE_MAP for bending moment (default "Mz")
+    sf_force_key : str   key into FORCE_MAP for shear force   (default "Fy")
+
+    Returns
+    -------
+    list[dict], one entry per load case:
+        {
+            "load_case":   str,
+            "max_bm":      float | None,   # kN·m, absolute value
+            "bm_location": float | None,   # m along span
+            "bm_girder":   str   | None,   # girder with max BM, e.g. "G3"
+            "max_sf":      float | None,   # kN, absolute value
+            "sf_location": float | None,   # m along span
+            "sf_girder":   str   | None,   # girder with max SF, e.g. "G2"
+        }
+    """
+
+    # ── 1. All load-case names from the dataset coordinate ────────────────
+    all_loadcases = [str(lc) for lc in ds_all.coords["Loadcase"].values]
+
+    # ── 2. Girder topology — identical to build_figure_bmd/sfd ───────────
+    # _find_girders returns {z_value: [elem_tags]} sorted by z.
+    # Each z-line is one longitudinal girder line.
+    girders      = _find_girders(nodes, members)
+    girder_items = list(girders.items())   # [(z_val, [elems]), ...]
+    n_girders    = len(girder_items)
+
+    # Resolve component name pairs from FORCE_MAP
+    bm_comp_i, bm_comp_j = FORCE_MAP[bm_force_key]
+    sf_comp_i, sf_comp_j = FORCE_MAP[sf_force_key]
+
+    results = []
+
+    # ── 3. One pass per load case ─────────────────────────────────────────
+    for lc_name in all_loadcases:
+
+        # Slice to this load case — same as mpl_plot_widget.update_plot()
+        ds = ds_all.sel(Loadcase=lc_name)
+
+        # Running global maxima across all girders for this load case
+        global_max_bm      = None
+        global_bm_location = None
+        global_bm_girder   = None   # girder with max BM
+        global_max_sf      = None
+        global_sf_location = None
+        global_sf_girder   = None   # girder with max SF
+
+        # ── 4. Walk every girder ──────────────────────────────────────────
+        for i, (z_val, elems) in enumerate(girder_items):
+            if not elems:
+                continue
+
+            # Skip edge beams — same guard as build_figure_bmd / build_figure_sfd
+            is_edge_beam = edge_dist > 0 and (i == 0 or i == n_girders - 1)
+            if is_edge_beam:
+                continue
+
+            # Girder label — identical naming logic to the plot functions:
+            #   edge_dist > 0  →  G0, G1, G2 … (0-indexed loop counter)
+            #   edge_dist == 0 →  G1, G2, G3 … (1-indexed)
+            girder_name = f"G{i}" if edge_dist > 0 else f"G{i + 1}"
+
+            # ── Bending Moment ────────────────────────────────────────────
+            # _build_polyline reads ds["forces"].sel(Element, Component) and
+            # returns values already converted to kN·m (divides by 1000).
+            # xs are the physical x-coordinates (metres along span).
+            try:
+                xs_bm, _, _, Mz, _ = _build_polyline(
+                    elems, members, nodes, bm_comp_i, bm_comp_j, ds
+                )
+                abs_Mz            = np.abs(Mz)
+                idx_bm            = int(np.argmax(abs_Mz))
+                girder_max_bm_val = float(abs_Mz[idx_bm])
+                girder_bm_x       = float(xs_bm[idx_bm])
+            except Exception:
+                girder_max_bm_val = None
+                girder_bm_x       = None
+
+            # ── Shear Force ───────────────────────────────────────────────
+            # Raw absolute values are used here (no sign flip) so both the
+            # i-node and j-node contributions are compared on equal terms.
+            try:
+                xs_sf, _, _, Vy, _ = _build_polyline(
+                    elems, members, nodes, sf_comp_i, sf_comp_j, ds
+                )
+                abs_Vy            = np.abs(Vy)
+                idx_sf            = int(np.argmax(abs_Vy))
+                girder_max_sf_val = float(abs_Vy[idx_sf])
+                girder_sf_x       = float(xs_sf[idx_sf])
+            except Exception:
+                girder_max_sf_val = None
+                girder_sf_x       = None
+
+            # ── 5. Update global maximum for this load case ───────────────
+            # Governing girder = largest |BM|; ties broken by largest |SF|.
+            bm_beats = (
+                girder_max_bm_val is not None
+                and (global_max_bm is None or girder_max_bm_val > global_max_bm)
+            )
+            sf_beats = (
+                girder_max_sf_val is not None
+                and (global_max_sf is None or girder_max_sf_val > global_max_sf)
+            )
+
+            if bm_beats:
+                global_max_bm      = girder_max_bm_val
+                global_bm_location = girder_bm_x
+                global_bm_girder   = girder_name
+
+            if sf_beats:
+                global_max_sf      = girder_max_sf_val
+                global_sf_location = girder_sf_x
+                global_sf_girder   = girder_name
+
+        # ── 6. Append result for this load case ───────────────────────────
+
+        results.append({
+            "load_case":   lc_name,
+            "max_bm":      round(global_max_bm,      3) if global_max_bm      is not None else None,
+            "bm_location": round(global_bm_location, 3) if global_bm_location is not None else None,
+            "bm_girder":   global_bm_girder,
+            "max_sf":      round(global_max_sf,      3) if global_max_sf      is not None else None,
+            "sf_location": round(global_sf_location, 3) if global_sf_location is not None else None,
+            "sf_girder":   global_sf_girder,
+        })
+
+    return results
