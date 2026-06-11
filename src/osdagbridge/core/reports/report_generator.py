@@ -1339,25 +1339,26 @@ A grillage model was used for structural analysis. The deck is idealized as a gr
 \hline
 \end{longtable}
 
-\vspace{1em}
+\vspace{2em}
 \noindent
-\fbox{
-\parbox{0.97\textwidth}{
-\textit{[ PLACEHOLDER: FIGURE --- Bending Moment Envelope: Plot of max/min BM along span for governing ULS and SLS combinations. X-axis: distance from left support (m). Y-axis: Bending Moment (kN-m). ]}
-}
-}
+""" + _fig_embed(fig_paths.get('bm_envelope'),
+    'Figure 4.1 -- Bending Moment Envelope (Envelope SLS): Max/min BM along span. '
+    'X-axis: distance from left support (m). Y-axis: Bending Moment (kN-m).',
+    width=r'0.7\textwidth') + r"""
 
-\vspace{1em}
+\vspace{10em}
 \noindent
-\fbox{
-\parbox{0.97\textwidth}{
-\textit{[ PLACEHOLDER: FIGURE --- Shear Force Envelope: Plot of max/min SF along span. X-axis: distance from left support (m). Y-axis: Shear Force (kN). ]}
-}
-}
+""" + _fig_embed(fig_paths.get('sf_envelope'),
+    'Figure 4.2 -- Shear Force Envelope (Envelope SLS): Max/min SF along span.'
+    'X-axis: distance from left support (m). Y-axis: Shear Force (kN).',
+    width=r'0.7\textwidth') + r"""
 
-\vspace{1em}
+\vspace{10em}
 \noindent
-""" + _fig_embed(fig_paths.get('grillage'), 'Figure 3 -- 3D Grillage Model with deformed shape') + r"""
+""" + _fig_embed(fig_paths.get('deflection_envelope'),
+    'Figure 4.3 -- Deflection Envelope (Envelope SLS): Max/min along span. '
+    'X-axis: distance from left support (m). Y-axis: Deflection (mm).',
+    width=r'0.7\textwidth') + r"""
 """
 
 
@@ -2247,7 +2248,6 @@ Inter. Stiffener ($I_s$) & --- & $} & $} & PASS \\[6pt]
 
 # Chapters 6-9: Drawings, Quantities, Logs, References
 
-
 def _fig_embed(path, caption, width=r'0.9\textwidth'):
     """Embed a real figure when path is provided (already copied); otherwise use an fbox placeholder."""
     if path:
@@ -2255,7 +2255,8 @@ def _fig_embed(path, caption, width=r'0.9\textwidth'):
         return (r'\begin{figure}[H]' + '\n'
                 r'\centering' + '\n'
                 r'\includegraphics[width=' + width + ']{' + p + '}\n'
-                r'\caption*{' + caption + '}\n'
+                r'\vspace{1.5em}' + '\n'
+                r'\caption*{\centering ' + caption + '}\n'
                 r'\end{figure}')
     # fbox placeholder — matches template exactly
     return (r'\noindent\fbox{\parbox{0.97\textwidth}{' + '\n'
@@ -2471,6 +2472,7 @@ class ReportFigures:
     girder_end:      Optional[str] = None
     bm_envelope:     Optional[str] = None
     sf_envelope:     Optional[str] = None
+    deflection_envelope:  Optional[str] = None
     shear_connector: Optional[str] = None
     cross_bracing:   Optional[str] = None
 
@@ -2842,6 +2844,7 @@ _FIGURE_MAP = [
     ('stiffener_preview',     'stiffener_preview.png'),
     ('bm_envelope',           'bm_envelope.png'),
     ('sf_envelope',           'sf_envelope.png'),
+    ('deflection_envelope',   'deflection_envelope.png'),
 ]
 
 def generate_report(payload, request):

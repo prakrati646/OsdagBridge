@@ -566,6 +566,141 @@ class PlateGirderBridge:
             len(figure_paths), figures_dir)
         return figure_paths
 
+
+    def _capture_envelope_sls_figures(self) -> dict:
+        """
+        Render BM, SF, and Deflection envelope figures for the 'Envelope SLS'
+        load case as PNG bytes. No files written to disk — mirrors the pattern
+        of cad_3d.capture_for_report().
+        """
+        import logging
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+
+        _log = logging.getLogger(__name__)
+        result = {}
+
+        ds_all = getattr(self, '_results_with_envelope', None)
+        if ds_all is None:
+            _log.warning('_capture_envelope_sls_figures: _results_with_envelope not found')
+            return result
+
+        ENVELOPE_SLS = 'Envelope SLS'
+        try:
+            available = list(ds_all.coords['Loadcase'].values)
+        except Exception:
+            available = []
+        if ENVELOPE_SLS not in available:
+            _log.warning('_capture_envelope_sls_figures: Envelope SLS not in dataset')
+            return result
+
+        ds = ds_all.sel(Loadcase=ENVELOPE_SLS)
+
+        def _apply_report_visibility(fig, hide_grillage_lines=False):
+            """
+            Apply report-safe visibility: isometric view, hide labels/supports/
+            axes/grid, show only max and min annotations.
+            """
+            if not fig.axes:
+                return
+            ax = fig.axes[0]
+
+            # Isometric view
+            ax.view_init(elev=30, azim=-60)
+            fig.suptitle('')
+            ax.set_title('')
+
+            # Hide axes box, panes, ticks, grid
+            ax.set_axis_off()
+
+            # Hide by GID
+            hidden_gids = {'girder_labels', 'coord_triad', 'all_vals',
+                        'node_number', 'element_number'}
+            show_gids   = {'max_line', 'min_line'}
+
+            for text in ax.texts:
+                gid = text.get_gid()
+                if gid in hidden_gids:
+                    text.set_visible(False)
+                elif gid in show_gids:
+                    text.set_visible(True)
+
+            for line in ax.lines:
+                gid = line.get_gid()
+                if gid in hidden_gids:
+                    line.set_visible(False)
+                elif gid in show_gids:
+                    line.set_visible(True)
+                elif hide_grillage_lines and gid is None:
+                    # Grillage background lines have no GID — identify by color
+                    c = line.get_color()
+                    if c in ('#388E3C', 'slategrey', '#388e3c'):
+                        line.set_visible(False)
+
+            for coll in ax.collections:
+                gid = coll.get_gid()
+                if gid in ('supports', 'coord_triad'):
+                    coll.set_visible(False)
+                elif hide_grillage_lines and gid is None:
+                    coll.set_visible(False)
+
+            fig.set_size_inches(10, 5)
+
+        # ── BM Envelope ──────────────────────────────────────────────────────
+        try:
+            fig, _ = self.build_figure_bmd(ds, 'Mz')
+            _apply_report_visibility(fig)
+            raw = self.figure_to_bytes(fig, dpi=300)
+            result['bm_envelope'] = self._crop_whitespace(raw)
+            plt.close(fig)
+        except Exception as exc:
+            _log.warning('_capture_envelope_sls_figures: bm_envelope failed: %s', exc)
+
+        # ── SF Envelope ───────────────────────────────────────────────────────
+        try:
+            fig, _ = self.build_figure_sfd(ds, 'Fy')
+            _apply_report_visibility(fig)
+            raw = self.figure_to_bytes(fig, dpi=300)
+            result['sf_envelope'] = self._crop_whitespace(raw)
+            plt.close(fig)
+        except Exception as exc:
+            _log.warning('_capture_envelope_sls_figures: sf_envelope failed: %s', exc)
+
+        # ── Deflection Envelope ───────────────────────────────────────────────
+        try:
+            fig, _ = self.build_figure_deflection(ds, 'Dy')
+            _apply_report_visibility(fig, hide_grillage_lines=True)
+            raw = self.figure_to_bytes(fig, dpi=300)
+            result['deflection_envelope'] = self._crop_whitespace(raw)
+            plt.close(fig)
+        except Exception as exc:
+            _log.warning('_capture_envelope_sls_figures: deflection_envelope failed: %s', exc)
+
+        return result
+
+    def _crop_whitespace(self, img_bytes: bytes, padding: int = 20) -> bytes:
+        """Crop whitespace borders from a PNG image bytes."""
+        import io
+        from PIL import Image
+        import numpy as np
+
+        img = Image.open(io.BytesIO(img_bytes)).convert('RGB')
+        arr = np.array(img)
+        mask = (arr < 245).any(axis=2)
+        rows = np.any(mask, axis=1)
+        cols = np.any(mask, axis=0)
+        rmin, rmax = np.where(rows)[0][[0, -1]]
+        cmin, cmax = np.where(cols)[0][[0, -1]]
+        rmin = max(0, rmin - padding)
+        rmax = min(arr.shape[0], rmax + padding)
+        cmin = max(0, cmin - padding)
+        cmax = min(arr.shape[1], cmax + padding)
+        cropped = img.crop((cmin, rmin, cmax, rmax))
+        buf = io.BytesIO()
+        cropped.save(buf, format='PNG')
+        return buf.getvalue()
+
     def generate_design_report(self, request, cad_generator, is_preview=False):
         """Compile the final PDF design report."""
         from osdagbridge.core.reports.report_generator import build_report_payload, generate_report
@@ -587,7 +722,11 @@ class PlateGirderBridge:
             if grillage_bytes:
                 figure_data['grillage'] = grillage_bytes
 
-        payload.figure_data = figure_data  # handed off; generate_report clears it after writing
+        # Chapter 4 envelope figures: BM, SF, Deflection (Envelope SLS)
+        envelope_figs = self._capture_envelope_sls_figures()
+        figure_data.update(envelope_figs)
+
+        payload.figure_data = figure_data
 
         return generate_report(payload, request)
 
