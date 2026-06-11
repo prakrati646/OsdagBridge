@@ -154,6 +154,14 @@ KEY_SD_WARPING_RESTRAINT = "steeldesign.details.warping_restraint"
 KEY_SD_WEB_TYPE = "steeldesign.details.web_type"
 KEY_SD_EFFECTIVE_SLAB_WIDTH = "steeldesign.details.effective_slab_width"
 
+# SLS Deflection outputs — Table 4.3 (Analysis Results) 
+KEY_SD_DEFL_LIVE_MM          = "steeldesign.details.deflection.live_mm"
+KEY_SD_DEFL_TOTAL_MM         = "steeldesign.details.deflection.total_mm"
+KEY_SD_DEFL_LIMIT_LIVE_MM    = "steeldesign.details.deflection.limit_live_mm"
+KEY_SD_DEFL_LIMIT_TOTAL_MM   = "steeldesign.details.deflection.limit_total_mm"
+KEY_SD_DEFL_LIVE_STATUS      = "steeldesign.details.deflection.live_status"
+KEY_SD_DEFL_TOTAL_STATUS     = "steeldesign.details.deflection.total_status"
+
 KEY_SD_SHEAR_YIELD_STRENGTH = "steeldesign.details.shear.yield_strength"
 KEY_SD_SHEAR_ULTIMATE_STRENGTH = "steeldesign.details.shear.ultimate_strength"
 KEY_SD_SHEAR_DIAMETER = "steeldesign.details.shear.diameter"

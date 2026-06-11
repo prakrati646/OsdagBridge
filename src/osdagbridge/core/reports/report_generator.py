@@ -222,6 +222,15 @@ from osdagbridge.core.utils.common import (
     KEY_SD_SECTION_PROP_ZZ,
     KEY_SD_SECTION_PROP_ZUZ,
     KEY_SD_EFFECTIVE_SLAB_WIDTH,
+
+    # SLS Deflection outputs (Table 4.3)
+    KEY_SD_DEFL_LIVE_MM,
+    KEY_SD_DEFL_TOTAL_MM,
+    KEY_SD_DEFL_LIMIT_LIVE_MM,
+    KEY_SD_DEFL_LIMIT_TOTAL_MM,
+    KEY_SD_DEFL_LIVE_STATUS,
+    KEY_SD_DEFL_TOTAL_STATUS,
+
     # Utilizations
     KEY_UTIL_FLEXURE,
     KEY_UTIL_SHEAR,
@@ -1325,19 +1334,20 @@ A grillage model was used for structural analysis. The deck is idealized as a gr
 
 \begin{longtable}{|L{7cm}|p{8.5cm}|}
 \hline
-\textbf{Deflection due to Live Load, delta\_LL} & """ + '' + r""" \\[6pt]
+\textbf{Deflection due to Live Load, $\delta_{LL}$} & """ + _render_value(bridge.output_dict, KEY_SD_DEFL_LIVE_MM, ' mm') + r""" \\[6pt]
 \hline
-\textbf{Allowable Live Load Deflection ()} & """ + '' + r""" \\[6pt]
+\textbf{Allowable Live Load Deflection (L/800)} & """ + _render_value(bridge.output_dict, KEY_SD_DEFL_LIMIT_LIVE_MM, ' mm') + r""" \\[6pt]
 \hline
-\textbf{Live Load Deflection Check Status} & """ + '' + r""" \\[6pt]
+\textbf{Live Load Deflection Check Status} & """ + _render_value(bridge.output_dict, KEY_SD_DEFL_LIVE_STATUS) + r""" \\[6pt]
 \hline
-\textbf{Deflection due to Total Load, delta\_total} & """ + '' + r""" \\[6pt]
+\textbf{Deflection due to Total Load, $\delta_{total}$} & """ + _render_value(bridge.output_dict, KEY_SD_DEFL_TOTAL_MM, ' mm') + r""" \\[6pt]
 \hline
-\textbf{Allowable Total Deflection ()} & """ + '' + r""" \\[6pt]
+\textbf{Allowable Total Deflection (L/600)} & """ + _render_value(bridge.output_dict, KEY_SD_DEFL_LIMIT_TOTAL_MM, ' mm') + r""" \\[6pt]
 \hline
-\textbf{Total Load Deflection Check Status} & """ + '' + r""" \\[6pt]
+\textbf{Total Load Deflection Check Status} & """ + _render_value(bridge.output_dict, KEY_SD_DEFL_TOTAL_STATUS) + r""" \\[6pt]
 \hline
 \end{longtable}
+
 
 \vspace{2em}
 \noindent

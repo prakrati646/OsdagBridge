@@ -126,6 +126,15 @@ from osdagbridge.core.utils.common import (
     KEY_SD_WARPING_RESTRAINT,
     KEY_SD_WEB_TYPE,
     KEY_SD_EFFECTIVE_SLAB_WIDTH,
+
+    # SLS Deflection outputs
+    KEY_SD_DEFL_LIVE_MM,
+    KEY_SD_DEFL_TOTAL_MM,
+    KEY_SD_DEFL_LIMIT_LIVE_MM,
+    KEY_SD_DEFL_LIMIT_TOTAL_MM,
+    KEY_SD_DEFL_LIVE_STATUS,
+    KEY_SD_DEFL_TOTAL_STATUS,
+
     # Shear connector card
     KEY_SD_SHEAR_YIELD_STRENGTH,
     KEY_SD_SHEAR_ULTIMATE_STRENGTH,
@@ -3081,6 +3090,21 @@ class PlateGirderBridge:
 
         # Effective slab width from the composite capacity check (mm)
         out[KEY_SD_EFFECTIVE_SLAB_WIDTH] = dr["beff_mm"]
+
+         # ── 2b. SLS Deflection outputs (Table 4.3 / Table 5.10) ─────────────────
+        # Actual deflections and allowable limits already computed by designer.py.
+        # PASS/FAIL status derived from DCR check_id 13 (live) and 14 (total).
+        out[KEY_SD_DEFL_LIVE_MM]        = dr.get("delta_live_mm",       0.0)  # mm
+        out[KEY_SD_DEFL_TOTAL_MM]       = dr.get("delta_total_mm",      0.0)  # mm
+        out[KEY_SD_DEFL_LIMIT_LIVE_MM]  = dr.get("defl_limit_live_mm",  0.0)  # mm (L/800)
+        out[KEY_SD_DEFL_LIMIT_TOTAL_MM] = dr.get("defl_limit_total_mm", 0.0)  # mm (L/600)
+        _checks = dr.get("checks", [])
+        out[KEY_SD_DEFL_LIVE_STATUS]    = next(
+            (c["status"] for c in _checks if c["check_id"] == 13), "—"
+        )
+        out[KEY_SD_DEFL_TOTAL_STATUS]   = next(
+            (c["status"] for c in _checks if c["check_id"] == 14), "—"
+        )
 
         # ── 3. Shear connector card ─────────────────────────────────────────────
         # All stud dimensions in mm; strengths in MPa; count and spacing as numbers.
